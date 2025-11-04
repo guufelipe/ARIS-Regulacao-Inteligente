@@ -1,0 +1,6 @@
+Condição de Reprovação,Implicação,Tipo de Dado/Termo
+Hemorragia digestiva alta com indicação de EDA de urgência.,Caráter de Urgência Imediata (Não é perfil Enfermaria),Palavras-chave/Texto Livre
+Hepatite fulminante.,Caráter de Urgência Grave (Requer UTI/Cuidado Intensivo),Palavras-chave/Texto Livre/CID-10
+Pacientes neoplásicos com definição diagnóstica e com indicação de acompanhamento pela oncologia.,Não é perfil (Encaminhamento Inadequado/Contra-referência),Palavras-chave/Texto Livre
+Pacientes com indicação de diálise (agudos ou crônicos).,Necessidade de Suporte de Outra Especialidade,Palavras-chave/Texto Livre
+Dispneia/necessidade de suporte de O**²**.,Necessidade de Suporte Respiratório (Não é perfil Enfermaria),Palavras-chave/Texto Livre/Sinais Vitais
