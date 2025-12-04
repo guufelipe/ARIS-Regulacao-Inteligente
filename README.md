@@ -137,6 +137,70 @@ PS. Alguns arquivos podem ainda não terem sidos criados por que ainda não cheg
 
 ---
 
+---
+
+## 📘 Protocolo de Acesso e Regras do Modelo
+
+O ARIS utiliza como referência o **Protocolo de Acesso da Gastro-Hepatologia (Enfermaria – HC-UFPE)**.  
+Todo o processo de extração, parsing e modelagem se baseia nos seguintes componentes:
+
+### ✔ Critérios de Aprovação (Elegibilidade)
+São condições clínicas e diagnósticas que, quando presentes no espelho, **indicam forte aderência ao perfil da enfermaria**.  
+Exemplos:
+
+- Disfagia grave com perda ponderal  
+- Diarreia crônica descompensada  
+- Doença inflamatória intestinal refratária  
+- Hepatites virais B e C agudas  
+- Hepatite alcoólica aguda  
+- Cirrose hepática descompensada  
+- Investigação de tumores gastrointestinais  
+
+### ❌ Critérios de Reprovação (Excludentes)
+Têm prioridade sobre os critérios de aprovação.  
+Se qualquer critério de reprovação aparecer, a solicitação deve ser recusada.
+
+Exemplos:
+
+- Hemorragia digestiva alta com indicação de EDA de urgência  
+- Hepatite fulminante  
+- Necessidade de suporte ventilatório  
+- Necessidade de diálise  
+- Neoplasia já definida com acompanhamento oncológico  
+- COVID-19 (regra institucional)  
+
+### ⚠ Regras Clínicas Especiais
+- **COVID-19 → recusa imediata**  
+- **Tuberculose → necessita avaliação humana (vaga de isolamento)**  
+- **Neoplasia + quimioterapia → encaminhar para oncologia**  
+- **Paciente interno do HC → tem prioridade regulatória**  
+
+---
+
+## 🗂️ Estrutura da Base de Dados (Schema)
+
+A tabela abaixo descreve as colunas geradas no processo de parsing e utilizadas como features para treinamento do modelo.
+
+| Feature | Tipo | Origem | Propósito |
+|--------|------|--------|-----------|
+| `Decisao_Final` | Categórica | Histórico do espelho | Variável alvo (Y) |
+| `Idade` | Numérica | Cadastro | Critério ≥18 anos |
+| `Diagnostico_Texto_Livre` | Texto | Justificativa médica | Input para NLP |
+| `CID_10` | Categórica | Campo CID | Detecção de hepato/gastro específicas |
+| `Sinais_Vitais_O2_Suporte` | Binário | Texto livre | Critério de reprovação |
+| `Historico_Neoplasia_Onco` | Binário | Histórico | Critério de reprovação |
+| `Necessidade_Dialise` | Binário | Texto livre | Critério de reprovação |
+| `Necessidade_EDA_Urgencia` | Binário | Texto livre | Critério de reprovação |
+| `Necessita_UTI_Potencial` | Binário | Texto livre | Gravidade extrema |
+| `Exames_Corroboram_Suspeita` | Categórico | Observações | Conformidade documental |
+
+O schema completo está em:  
+📄 `docs/dicionario_variaveis.md`  
+📄 `docs/metadata.md`
+
+---
+
+
 ## ⚖️ Ética e Conformidade (LGPD e CNS 510/2016)
 
 O ARIS segue integralmente:
