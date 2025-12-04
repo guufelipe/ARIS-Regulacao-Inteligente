@@ -1,51 +1,171 @@
-# 🏥 Projeto ARIS: Apoio Regulatório Inteligente em Saúde
-
-## Visão Geral do Projeto
-
-Este repositório contém os ativos e códigos do projeto **ARIS (Apoio Regulatório Inteligente em Saúde)**, uma iniciativa de Iniciação Tecnológica (PIT/Ebserh/CNPq) focada em aplicar Inteligência Artificial (IA) para aprimorar o processo de regulação interhospitalar no Sistema Único de Saúde (SUS).
-
-O objetivo principal é desenvolver um protótipo de sistema capaz de analisar automaticamente os "espelhos de solicitação" de pacientes, prevendo a aderência ou não ao perfil regulatório do serviço de destino (HC-UFPE/Gastroenterologia).
+# 🏥 ARIS – Apoio Regulatório Inteligente em Saúde  
+### Sistema de IA para suporte ao processo de regulação interhospitalar no SUS
 
 ---
 
-## Foco e Metodologia (Fase Atual: Engenharia de Dados)
+## 📌 Visão Geral
 
-Estamos atualmente no **1º Trimestre** do projeto, focado na **Engenharia de Dados** e na **Arquitetura da Solução**, conforme a metodologia proposta:
+O **ARIS** é um sistema de Inteligência Artificial desenvolvido no âmbito do Programa de Iniciação Tecnológica (PIT/Ebserh/CNPq), com o objetivo de **analisar automaticamente espelhos de solicitação de regulação** e prever sua **aderência aos perfis regulatórios** dos serviços hospitalares de destino (fase piloto: Gastroenterologia do HC-UFPE).
 
-1. **Mapeamento de Critérios:** Mapeamento detalhado dos protocolos de elegibilidade (Critérios de Aprovação e Reprovação) do setor de Gastroenterologia.
-2.  **Extração de Dados:** Desenvolvimento de rotinas de pré-processamento para extrair dados estruturados a partir de documentos não estruturados (PDFs de espelhos de solicitação).
-3.  **Estruturação da Base:** Criação da base de dados inicial (DataFrames) que servirá para o treinamento dos modelos preditivos na Fase 2.
+A solução utiliza:
+
+- Engenharia de Dados  
+- NLP (Processamento de Linguagem Natural)  
+- Modelagem Preditiva (XGBoost, Random Forest, MLP)  
+- Técnicas de explicabilidade (SHAP/LIME)  
+- Protótipo de interface de simulação  
+
+O sistema é destinado a apoiar — nunca substituir — a decisão dos reguladores.
+
+---
+
+## 🧱 Arquitetura Geral (3 Fases)
+
+### **Fase 1 — Engenharia de Dados**
+- Coleta retrospectiva dos espelhos de solicitação  
+- Extração de texto de PDFs (pdfplumber / OCR)  
+- Parsing e padronização dos campos clínicos  
+- Anonimização (LGPD)  
+- Construção do dicionário de variáveis  
+- Análise descritiva (frequências, tendências, correlações)  
+
+### **Fase 2 — Modelagem Preditiva**
+- NLP para texto clínico (TF-IDF ou embeddings)  
+- Divisão treino/validação/teste (70/15/15)  
+- Modelos utilizados:
+  - XGBoost (principal)
+  - Random Forest (baseline)
+  - MLP simples
+- Avaliação:
+  - Acurácia
+  - AUC-ROC
+  - F1-score
+  - Precision–Recall
+- Explicabilidade:
+  - SHAP
+  - LIME  
+
+### **Fase 3 — Protótipo e Simulações**
+- Interface web de simulação  
+- Retorno da probabilidade de aderência  
+- Destacar variáveis mais influentes  
+- Simulações retrospectivas com casos reais  
+- Medição de impacto:
+  - Redução do tempo de triagem
+  - Reencaminhamentos evitáveis
+  - Concordância com decisões históricas  
+
+---
 
 ## 📂 Estrutura do Repositório
 
-O projeto está organizado nas seguintes pastas principais para garantir clareza e separação entre dados brutos e códigos:
+ARIS/
+│
+├── README.md
+├── .gitignore
+├── requirements.txt
+│
+├── data/
+│   ├── raw/                    # PDFs originais (espelhos) + protocolos
+│   ├── interim/                # Textos extraídos, JSON, resultados intermediários
+│   └── processed/              # DataFrames finais prontos para modelagem (CSV/Parquet)
+│
+├── src/
+│   ├── extraction/             # Módulos de extração de texto dos PDFs
+│   │   ├── pdf_extractor.py
+│   │   ├── text_cleaner.py
+│   │   └── ocr_utils.py
+│   │
+│   ├── parsing/                # Regras para estruturar o texto em tabelas
+│   │   ├── parser_espelho.py
+│   │   └── criterios_gastro.py
+│   │
+│   ├── features/               # Engenharia de features
+│   │   ├── feature_builder.py
+│   │   └── text_vectorization.py
+│   │
+│   ├── models/                 # Treinamento e predição
+│   │   ├── train_xgboost.py
+│   │   ├── evaluate_model.py
+│   │   └── inference.py
+│   │
+│   └── utils/                  # Funções auxiliares
+│       ├── logger.py
+│       └── file_utils.py
+│
+├── notebooks/
+│   ├── 01_exploracao_dados.ipynb
+│   ├── 02_limpeza_texto.ipynb
+│   ├── 03_engenharia_features.ipynb
+│   └── 04_modelagem.ipynb
+│
+├── models/
+│   ├── xgboost_model.json      # Modelo treinado
+│   └── vectorizers/            # TF-IDF / Embeddings
+│
+└── docs/
+    ├── arquitetura_pipeline.png
+    ├── criterios_regulacao.pdf
+    └── relatorio_tecnico.pdf
 
-| Pasta | Conteúdo Principal | Descrição e Propósito |
 
-| **`code/`** | Notebooks Jupyter (`.ipynb`) e scripts Python. | Contém a lógica de extração, tratamento e as futuras fases de modelagem e validação. |
-| **`code/planilhas_geradas/`** | Arquivos `.csv` e `.xlsx` gerados pelos Notebooks. | **Dados Estruturados:** Inclui as tabelas de regras (Critérios de Aprovação/Reprovação) e a tabela principal (`Solicitações_Espelhos_Brutos.csv`). |
-| **`espelhos_pdf/`** | Documentos PDF originais. | Contém os **Dados Brutos (Input):** Protocolo de Acesso e os Espelhos de Solicitação/Regulação analisados, todos devidamente anonimizados. |
+PS. Alguns arquivos podem ainda não terem sidos criados por que ainda não chegamos na fase de desenvolvimento onde se faz necessário.
+
 
 ---
 
-## Próximos Passos
+## 🧪 Indicadores e Metas do Projeto
 
-Após a conclusão da Engenharia de Dados inicial, o foco será:
-
-* **Engenharia de Features:** Criação de *flags* binárias e variáveis numéricas a partir do texto livre e dos sinais vitais.
-* **Modelagem Preditiva:** Treinamento de modelos de IA supervisionada (e.g., Random Forest, XGBoost) para prever a aderência ao perfil regulatório.
-
----
-
-## Equipe e Instituições
-
-* **Aluno Bolsista (IC/PIT):** Gustavo Felipe Alves Da Silva
-* **Orientador:** Fernando José Moreira de Oliveira Júnior
-* **Projeto:** ARIS: Apoio Regulatório Inteligente em Saúde
-* **Programa:** Programa de Iniciação Tecnológica (PIT Ebserh/CNPq)
+| Indicador | Meta |
+|----------|------|
+| **Acurácia do modelo** | ≥ 85% |
+| **AUC-ROC** | ≥ 0,90 |
+| **Redução do tempo de triagem (simulada)** | ≥ 40% |
+| **Concordância pós-explicabilidade** | ≥ 70% |
+| **Reencaminhamentos evitados (simulação)** | ≥ 50% |
 
 ---
 
-## ⚖️ Conformidade Legal e Ética
+## 🗓️ Cronograma Oficial (12 meses)
 
-Este projeto é desenvolvido em estrita conformidade com a **Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018)** e a **Resolução CNS nº 510/2016**. [cite_start]Todos os dados são previamente anonimizados, e a IA é utilizada estritamente como um sistema de apoio à decisão, sob supervisão humana contínua.
+| Trimestre | Foco Principal | Produtos |
+|----------|----------------|----------|
+| **1º trimestre** | Estudos Teóricos + Engenharia de Dados Inicial | Dicionário de variáveis, base anonimizada inicial |
+| **2º trimestre** | Pré-processamento + Análise Descritiva | Tabelas finais, gráficos, relatório exploratório |
+| **3º trimestre** | Modelagem Preditiva | Modelos treinados + SHAP/LIME + relatório |
+| **4º trimestre** | Protótipo + Simulações | Interface, testes retrospectivos, relatório final + resumo científico |
+
+---
+
+## ⚖️ Ética e Conformidade (LGPD e CNS 510/2016)
+
+O ARIS segue integralmente:
+
+- **LGPD (Lei nº 13.709/2018)**  
+- **Resolução CNS nº 510/2016**  
+- **PL 2.338/2023 (IA em saúde: alto risco)**  
+
+Todos os dados utilizados são **anonimizados** previamente e manipulados em ambiente seguro.  
+A IA é usada **exclusivamente como apoio à decisão**, sempre com supervisão humana.
+
+---
+
+## 👥 Equipe
+
+- **Aluno Bolsista:** Gustavo Felipe Alves da Silva  
+- **Orientador:** Prof. Fernando Moreira (HC-UFPE / Ebserh)  
+- **Colaboradores:** Nara Cavalcanti 
+
+---
+
+## 📄 Publicações, Disseminação e Produtos Esperados
+- Relatório técnico de Iniciação Tecnológica  
+- Resumo científico para congressos  
+- Protótipo funcional do ARIS  
+- Artigo científico (dependendo dos resultados)  
+
+---
+
+Projeto: ARIS – Apoio Regulatório Inteligente em Saúde  
+Instituição: HC-UFPE / Ebserh  
+
