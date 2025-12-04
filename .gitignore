@@ -1,0 +1,21 @@
+#Seguindo padrões comuns de .gitignore para projetos de ML e ciência de dados
+
+# Python
+__pycache__/
+*.pyc
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Data
+data/raw/*
+data/interim/*
+data/processed/*
+
+# Models
+models/*
+!models/README.md
+
+# Environment
+.venv/
+.env

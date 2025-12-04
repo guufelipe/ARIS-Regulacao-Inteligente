@@ -1,0 +1,11 @@
+pandas
+numpy
+pdfplumber
+pytesseract
+opencv-python
+scikit-learn
+xgboost
+regex
+python-dotenv
+nltk
+
