@@ -73,21 +73,21 @@ ARIS/
 ├── src/
 │   ├── extraction/             # Módulos de extração de texto dos PDFs
 │   │   ├── pdf_extractor.py
-│   │   ├── text_cleaner.py
-│   │   └── ocr_utils.py
+│   │   ├── text_cleaner.py     # Decodificador
+│   │   └── ocr_utils.py        # Caso o pdf não seja 'copiavel'
 │   │
 │   ├── parsing/                # Regras para estruturar o texto em tabelas
-│   │   ├── parser_espelho.py
-│   │   └── criterios_gastro.py
+│   │   ├── parser_espelho.py   # Extrator
+│   │   └── criterios_gastro.py # Regras de Negócio do Gastro
 │   │
 │   ├── features/               # Engenharia de features
-│   │   ├── feature_builder.py
-│   │   └── text_vectorization.py
+│   │   ├── feature_builder.py  # Limpeza Tabular
+│   │   └── text_vectorization.py # NLP / TF-IDF
 │   │
 │   ├── models/                 # Treinamento e predição
-│   │   ├── train_xgboost.py
-│   │   ├── evaluate_model.py
-│   │   └── inference.py
+│   │   ├── train_xgboost.py    # Script de treinamento
+│   │   ├── evaluate_model.py   # Script de predição
+│   │   └── inference.py        # Graficos
 │   │
 │   └── utils/                  # Funções auxiliares
 │       ├── logger.py
@@ -161,7 +161,7 @@ Têm prioridade sobre os critérios de aprovação.
 Se qualquer critério de reprovação aparecer, a solicitação deve ser recusada.
 
 Exemplos:
-
+  
 - Hemorragia digestiva alta com indicação de EDA de urgência  
 - Hepatite fulminante  
 - Necessidade de suporte ventilatório  

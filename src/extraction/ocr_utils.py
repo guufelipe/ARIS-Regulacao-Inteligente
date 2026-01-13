@@ -1,0 +1,1 @@
+## Esse arquivo serve como alternativa caso não consigamos extrair os dados via fitz. 
