@@ -67,7 +67,6 @@ ARIS/
 │
 ├── data/
 │   ├── raw/                    # PDFs originais (espelhos) + protocolos
-│   ├── interim/                # Textos extraídos, JSON, resultados intermediários
 │   └── processed/              # DataFrames finais prontos para modelagem (CSV/Parquet)
 │
 ├── src/
@@ -111,6 +110,35 @@ ARIS/
 
 PS. Alguns arquivos podem ainda não terem sidos criados por que ainda não chegamos na fase de desenvolvimento onde se faz necessário.
 
+
+---
+
+## 🚀 Como Rodar ao Adicionar Novos Dados (data/raw)
+
+Sempre que eu colocar novos PDFs em `data/raw`, eu posso reprocessar a base com o pipeline de ingestão para atualizar o CSV consolidado em `data/processed/dataset_espelhos.csv`.
+
+1) (Opcional) Criar e ativar ambiente virtual (Windows/PowerShell)
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+2) Instalar dependências
+
+```powershell
+pip install -r requirements.txt
+```
+
+3) Executar o pipeline de ingestão
+
+```powershell
+python run_ingestion.py
+```
+
+- O arquivo de saída será sobrescrito: `data/processed/dataset_espelhos.csv`.
+- Se um PDF não tiver texto (imagem escaneada), considerar realizar OCR antes de reprocessar (ver `src/extraction/ocr_utils.py`).
+- Script responsável: [run_ingestion.py](run_ingestion.py)
 
 ---
 
