@@ -23,7 +23,7 @@ class FeatureBuilder:
     def transform(self, df):
         """
         Aplica as transformações nos dados:
-        1. Validação de Idade (Idade < 18 vira NaN)
+        1. Validação de Idade (Idade < 15 vira NaN)
         2. Encoding de Sexo
         3. Garantia de Flags Numéricas
         """
@@ -38,7 +38,7 @@ class FeatureBuilder:
             # REGRA DE NEGÓCIO: Enfermaria Adulto.
             # Se a idade for < 18, assumimos erro de parsing ou dado inválido.
             # Transformamos em NaN para o XGBoost tratar como "Valor Desconhecido".
-            df_clean.loc[df_clean['Idade'] < 18, 'Idade'] = np.nan
+            df_clean.loc[df_clean['Idade'] < 15, 'Idade'] = np.nan
 
         # --- 2. Encoding de Sexo ---
         # 1 = Masculino, 0 = Feminino/Outros

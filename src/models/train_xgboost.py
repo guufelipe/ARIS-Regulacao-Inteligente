@@ -78,7 +78,7 @@ def train_model():
 
     # 5. Preparação para o Treino
     # Removo colunas que não entram no modelo
-    cols_to_drop = ['Nome_Arquivo', 'Diagnostico_Texto_Livre', 'Sexo', 'CID_10', 'Target']
+    cols_to_drop = ['Nome_Arquivo', 'Sexo', 'CID_10', 'Target']
     features = [c for c in df_full.columns if c not in cols_to_drop]
     
     X = df_full[features]
