@@ -229,6 +229,55 @@ O schema completo está em:
 ---
 
 
+## 🔁 Visão Geral dos Pipelines
+
+### 1️⃣ Pipeline de Ingestão (PDF → Dataset)
+
+Responsável por:
+- Ler arquivos PDF em `data/raw`
+- Extrair texto dos documentos
+- Aplicar parsing clínico
+- Estruturar os dados
+- Gerar um arquivo CSV para uso nas próximas etapas
+
+Script principal:
+src/parsing/run_ingestion.py
+
+
+### 2️⃣ Pipeline de Treinamento (Dataset → Modelo)
+
+Responsável por:
+- Engenharia de features
+- Vetorização de texto com TF-IDF
+- Treinamento do modelo XGBoost
+- Salvamento dos artefatos (modelo e vetorizador)
+
+Script principal:
+src/models/train_xgboost.py
+
+### 3️⃣ Pipeline de Inferência (Novo Caso → Decisão)
+
+Responsável por:
+- Aplicar regras soberanas de exclusão
+- Executar inferência com IA (quando permitido)
+- Retornar uma decisão explicável
+
+Script principal:
+src/models/inference.py
+
+
+
+## 🧱 Criação do Ambiente Virtual (Recomendado)
+
+### Windows (PowerShell)
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+
+
 ## ⚖️ Ética e Conformidade (LGPD e CNS 510/2016)
 
 O ARIS segue integralmente:
