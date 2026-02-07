@@ -1,121 +1,205 @@
-import pandas as pd
-import joblib
+"""
+Treinamento do modelo XGBoost do projeto ARIS.
+
+Este script:
+- Utiliza dados clínicos extraídos de espelhos de regulação
+- Combina regras clínicas (flags tabulares) com NLP (TF-IDF)
+- Treina um modelo supervisionado com target heurístico (provisório)
+
+IMPORTANTE:
+O target ainda NÃO representa a decisão real da regulação.
+Ele simula a lógica do protocolo oficial enquanto não há rótulos reais.
+"""
+
 import os
 import numpy as np
+import pandas as pd
+import joblib
+
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from src.features.text_vectorization import vectorize_text
-from src.features.feature_builder import FeatureBuilder # <--- Importando a nova classe
 
-# Meus caminhos de arquivo
+from src.features.text_vectorization import vectorize_text
+from src.features.feature_builder import FeatureBuilder
+
+
+# =============================================================================
+# CONFIGURAÇÕES DE CAMINHO
+# =============================================================================
+
 PROCESSED_DATA_PATH = 'data/processed/dataset_espelhos.csv'
 MODEL_OUTPUT_PATH = 'models/xgboost_model.json'
 VECTORIZER_PATH = 'models/vectorizers/tfidf_vectorizer.pkl'
 
+
+# =============================================================================
+# TARGET HEURÍSTICO (PROVISÓRIO)
+# =============================================================================
+
 def gerar_target_simulado(row):
     """
-    Gera targets simulados baseados nas regras de negócio (Heurística).
-    Necessário pois ainda não temos o feedback real da regulação (Aprovado/Reprovado).
+    Gera um rótulo binário (Target) simulando a decisão da regulação,
+    baseado estritamente nas regras do protocolo.
+
+    Retorna:
+    1 → Caso elegível para gastro
+    0 → Caso NÃO elegível
     """
-    # Critérios de exclusão soberanos
-    if (row['Necessidade_Dialise'] == 1 or 
-        row['Sinais_Vitais_O2_Suporte'] == 1 or 
+
+    # Critérios de exclusão são soberanos
+    if (
+        row['Necessidade_Dialise'] == 1 or
+        row['Sinais_Vitais_O2_Suporte'] == 1 or
         row['Instabilidade_Hemodinamica'] == 1 or
         row['Hemorragia_Ativa'] == 1 or
         row['Suspeita_Infecciosa'] == 1 or
-        row['Oncologia_Fora_Perfil'] == 1):
+        row['Oncologia_Fora_Perfil'] == 1
+    ):
         return 0
-    
-    # Critério de inclusão
+
+    # Critério de inclusão (perfil gastro)
     if row['Sinais_Gastro_Hepato'] == 1:
         return 1
-        
+
     return 0
 
+
+# =============================================================================
+# PIPELINE DE TREINAMENTO
+# =============================================================================
+
 def train_model():
-    print("🚀 Iniciei o treinamento do modelo ARIS (Modo Estrito - Sem Imputação)...")
-    
-    # 1. Carregamento
+    print("🚀 Iniciando treinamento do modelo ARIS (XGBoost)...")
+
+    # -------------------------------------------------------------------------
+    # 1. CARREGAMENTO DOS DADOS
+    # -------------------------------------------------------------------------
     if not os.path.exists(PROCESSED_DATA_PATH):
-        print(f"❌ Não encontrei o arquivo em {PROCESSED_DATA_PATH}. Rode run_ingestion.py primeiro.")
+        print(f"❌ Arquivo não encontrado: {PROCESSED_DATA_PATH}")
+        print("👉 Execute o pipeline de ingestão antes do treino.")
         return
 
     df = pd.read_csv(PROCESSED_DATA_PATH)
-    print(f"📊 Carreguei {df.shape[0]} registros para análise.")
+    print(f"📊 Registros carregados: {df.shape[0]}")
 
-    # 2. Engenharia de Features Tabulares (FeatureBuilder)
-    print("🔧 Aplicando limpeza de dados (FeatureBuilder)...")
-    builder = FeatureBuilder()
-    builder.fit(df) # Não faz nada no modo atual, mas mantemos o padrão
-    df = builder.transform(df)
-
-    # Verificação de integridade
-    nulos_idade = df['Idade'].isna().sum()
-    if nulos_idade > 0:
-        print(f"⚠️ Aviso: Existem {nulos_idade} registros com Idade inválida/nula. O XGBoost lidará com eles.")
-
-    # 3. Geração do Target (Provisório)
-    print("🎯 Gerando targets simulados...")
+    # -------------------------------------------------------------------------
+    # 2. GERAÇÃO DO TARGET (HEURÍSTICO)
+    # -------------------------------------------------------------------------
+    print("🎯 Gerando target heurístico baseado no protocolo...")
     df['Target'] = df.apply(gerar_target_simulado, axis=1)
-    
-    print("⚖️ Distribuição das Classes (0=Reprova, 1=Aprova):")
+
+    print("⚖️ Distribuição das classes:")
     print(df['Target'].value_counts())
 
-    # 4. Vetorização (NLP)
-    print("🔠 Vetorizando o texto clínico...")
-    df_full, vectorizer = vectorize_text(df, text_column='Diagnostico_Texto_Livre', max_features=90)
-    
-    # Se a vetorização falhar (texto vazio), interrompe
+    # -------------------------------------------------------------------------
+    # 3. VETORIZAÇÃO DOS TEXTOS CLÍNICOS (NLP)
+    # -------------------------------------------------------------------------
+    print("🔠 Vetorizando textos clínicos com TF-IDF...")
+
+    # Campos textuais relevantes do espelho
+    TEXT_COLUMNS = [
+        'Justificativa_Internacao',
+        'Evolucao',
+        'Sinais_Vitais_Texto'
+    ]
+
+    df_nlp, vectorizer = vectorize_text(
+        df,
+        text_columns=TEXT_COLUMNS,
+        max_features=300  # Espaço maior para capturar termos clínicos
+    )
+
     if vectorizer is None:
-        print("❌ Erro fatal na vetorização. Abortando.")
+        print("❌ Falha na vetorização (textos vazios). Abortando treino.")
         return
 
-    # Salvo o vetorizador
+    # Salva o vetorizador para uso em inferência
     os.makedirs(os.path.dirname(VECTORIZER_PATH), exist_ok=True)
     joblib.dump(vectorizer, VECTORIZER_PATH)
     print(f"💾 Vetorizador salvo em: {VECTORIZER_PATH}")
 
-    # 5. Preparação para o Treino
-    # Removo colunas que não entram no modelo
-    cols_to_drop = ['Nome_Arquivo', 'Sexo', 'CID_10', 'Target']
-    features = [c for c in df_full.columns if c not in cols_to_drop]
-    
-    X = df_full[features]
-    y = df_full['Target']
+    # -------------------------------------------------------------------------
+    # 4. FEATURE BUILDER (TABULAR FINAL)
+    # -------------------------------------------------------------------------
+    print("🔧 Aplicando FeatureBuilder (limpeza e validação final)...")
 
-    # Separo Treino e Teste
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    builder = FeatureBuilder()
+    df_final = builder.transform(df_nlp)
 
-    # 6. Treinamento do XGBoost
-    model = XGBClassifier(
-        n_estimators=100,
-        learning_rate=0.1,
-        max_depth=3,
-        use_label_encoder=False,
-        eval_metric='logloss',
-        missing=np.nan  # Explicitamente dizemos ao modelo como tratar nulos
+    # Aviso de integridade da idade
+    if 'Idade' in df_final.columns:
+        nulos_idade = df_final['Idade'].isna().sum()
+        if nulos_idade > 0:
+            print(f"⚠️ {nulos_idade} registros com Idade inválida (NaN).")
+
+    # -------------------------------------------------------------------------
+    # 5. SEPARAÇÃO DE FEATURES E TARGET
+    # -------------------------------------------------------------------------
+    print("🧱 Preparando matriz de treino...")
+
+    X = df_final.drop(columns=['Target'])
+    y = df_final['Target']
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.3,
+        random_state=42,
+        stratify=y
     )
-    
-    print("🧠 Treinando o modelo...")
+
+    print(f"📐 Treino: {X_train.shape} | Teste: {X_test.shape}")
+
+    # -------------------------------------------------------------------------
+    # 6. TREINAMENTO DO MODELO
+    # -------------------------------------------------------------------------
+    model = XGBClassifier(
+        n_estimators=150,
+        learning_rate=0.05,
+        max_depth=3,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        eval_metric='logloss',
+        missing=np.nan,
+        random_state=42
+    )
+
+    print("🧠 Treinando XGBoost...")
     model.fit(X_train, y_train)
 
-    # 7. Avaliação
-    print("\n--- Resultados do Modelo ---")
+    # -------------------------------------------------------------------------
+    # 7. AVALIAÇÃO
+    # -------------------------------------------------------------------------
+    print("\n📊 Avaliação do modelo (Target heurístico):")
     y_pred = model.predict(X_test)
-    print(classification_report(y_test, y_pred))
-    
-    model.save_model(MODEL_OUTPUT_PATH)
-    print(f"\n✅ Modelo salvo em: {MODEL_OUTPUT_PATH}")
+    print(classification_report(y_test, y_pred, digits=3))
 
-    # 8. Importância das Variáveis
-    importances = pd.DataFrame({
-        'Feature': features,
-        'Importance': model.feature_importances_
-    }).sort_values(by='Importance', ascending=False)
-    
-    print("\n🔍 Variáveis mais importantes:")
-    print(importances.head(5))
+    # -------------------------------------------------------------------------
+    # 8. SALVAMENTO DO MODELO
+    # -------------------------------------------------------------------------
+    os.makedirs(os.path.dirname(MODEL_OUTPUT_PATH), exist_ok=True)
+    model.save_model(MODEL_OUTPUT_PATH)
+    print(f"✅ Modelo salvo em: {MODEL_OUTPUT_PATH}")
+
+    # -------------------------------------------------------------------------
+    # 9. IMPORTÂNCIA DAS FEATURES
+    # -------------------------------------------------------------------------
+    importances = (
+        pd.DataFrame({
+            'Feature': X.columns,
+            'Importance': model.feature_importances_
+        })
+        .sort_values(by='Importance', ascending=False)
+    )
+
+    print("\n🔍 Top 10 variáveis mais importantes:")
+    print(importances.head(10))
+
+
+# =============================================================================
+# ENTRYPOINT
+# =============================================================================
 
 if __name__ == "__main__":
     train_model()
