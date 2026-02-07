@@ -1,87 +1,134 @@
-
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-import nltk  
-from nltk.corpus import stopwords
 import re
+import nltk
+from sklearn.feature_extraction.text import TfidfVectorizer
+from nltk.corpus import stopwords
 
-# Baixar stopwords em português se ainda não tiver
+# =============================
+# SETUP
+# =============================
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
     nltk.download('stopwords')
 
-def clean_text_for_nlp(text):
-    """
-    Limpeza final específica para NLP:
-    - Remove pontuação e caracteres especiais
-    - Remove números soltos
-    - Deixa tudo minúsculo
-    """
+TEXT_COLUMNS = [
+    'Justificativa_Internacao',
+    'Evolucao',
+    'Sinais_Vitais_Texto'
+]
+
+# =============================
+# LIMPEZA BASE
+# =============================
+def basic_text_clean(text):
     if not isinstance(text, str):
         return ""
-    
-    # Remove caracteres especiais e números, mantém apenas letras e acentos
-    text = re.sub(r'[^a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]', '', text)
-    # Remove espaços extras
-    text = re.sub(r'\s+', ' ', text).strip().lower()
+    text = text.lower()
+    text = re.sub(r'[^\w\sáàâãéèêíïóôõöúçñ]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-def vectorize_text(df, text_column='Diagnostico_Texto_Livre', max_features=100):
-    """
-    Transforma a coluna de texto em uma matriz numérica usando TF-IDF.
-    
-    Args:
-        df: DataFrame contendo a coluna de texto.
-        text_column: Nome da coluna de texto.
-        max_features: Número máximo de palavras no vocabulário.
-    
-    Returns:
-        df_final: DataFrame original + colunas do TF-IDF
-        vectorizer: O objeto treinado (para usar depois em novos dados)
-    """
-    print("--- Iniciando Vetorização (TF-IDF) ---")
-    
-    # 1. Limpeza Prévia
-    clean_texts = df[text_column].apply(clean_text_for_nlp)
-    
-    # 2. Configurar Stopwords (palavras para ignorar: "de", "para", "o", "a")
-    try:
-        pt_stopwords = stopwords.words('portuguese')
-    except:
-        nltk.download('stopwords')
-        pt_stopwords = stopwords.words('portuguese')
+# =============================
+# EXTRAÇÃO SEMÂNTICA DE NÚMEROS
+# =============================
+def extract_clinical_numeric_tokens(text):
+    tokens = []
 
-    # Adicionar stopwords clínicas comuns que não ajudam na decisão
+    # Saturação
+    match_sat = re.findall(r'sat[o0]2\s*(\d{2})', text)
+    for v in match_sat:
+        v = int(v)
+        if v < 90:
+            tokens.append('sato2_baixa')
+        elif v < 95:
+            tokens.append('sato2_limite')
+
+    # Frequência cardíaca
+    match_fc = re.findall(r'fc\s*(\d{2,3})', text)
+    for v in match_fc:
+        v = int(v)
+        if v >= 120:
+            tokens.append('taquicardia')
+        elif v <= 50:
+            tokens.append('bradicardia')
+
+    # Pressão arterial
+    match_pa = re.findall(r'pa\s*(\d{2,3})\s*[x/]\s*(\d{2,3})', text)
+    for sist, diast in match_pa:
+        sist, diast = int(sist), int(diast)
+        if sist < 90 or diast < 60:
+            tokens.append('hipotensao')
+
+    # Creatinina
+    match_creat = re.findall(r'creatinina\s*(\d+[.,]?\d*)', text)
+    for v in match_creat:
+        v = float(v.replace(',', '.'))
+        if v >= 2.0:
+            tokens.append('creatinina_alta')
+
+    return tokens
+
+# =============================
+# PREPARAÇÃO FINAL PARA NLP
+# =============================
+def prepare_text_for_vectorization(row):
+    textos = []
+
+    for col in TEXT_COLUMNS:
+        raw = row.get(col, "")
+        cleaned = basic_text_clean(raw)
+        numeric_tokens = extract_clinical_numeric_tokens(cleaned)
+
+        bloco = f"{col.lower()} {cleaned} {' '.join(numeric_tokens)}"
+        textos.append(bloco)
+
+    return " ".join(textos)
+
+# =============================
+# VETORIZAÇÃO TF-IDF
+# =============================
+def vectorize_text(
+    df,
+    max_features=300
+):
+    print("🧠 Iniciando Vetorização TF-IDF (v2 clínica)...")
+
+    # Texto final agregado
+    corpus = df.apply(prepare_text_for_vectorization, axis=1)
+
+    # Stopwords
+    pt_stopwords = stopwords.words('portuguese')
     custom_stopwords = pt_stopwords + [
-        'paciente', 'anos', 'solicito', 'avaliação', 'encaminho', 
-        'hospital', 'serviço', 'admissão', 'data', 'hora', 'hd', 'dia'
+        'paciente', 'relata', 'apresenta', 'encontra', 'se',
+        'avaliação', 'solicito', 'encaminho', 'hospital',
+        'serviço', 'data', 'hora', 'dia', 'quadro', 
     ]
 
-    # 3. Configurar TF-IDF
     tfidf = TfidfVectorizer(
         max_features=max_features,
         stop_words=custom_stopwords,
-        ngram_range=(1, 2) # Pega palavras sozinhas e pares (ex: "insuficiencia renal")
+        ngram_range=(1, 3),
+        min_df=2
     )
 
-    # 4. Aprender e Transformar
     try:
-        tfidf_matrix = tfidf.fit_transform(clean_texts)
-    except ValueError as e:
-        print("⚠️ Aviso: O texto está vazio ou só tem stopwords. Retornando DataFrame sem NLP.")
+        tfidf_matrix = tfidf.fit_transform(corpus)
+    except ValueError:
+        print("⚠️ Texto insuficiente para TF-IDF.")
         return df, None
-    
-    # Criar DataFrame com as palavras
+
     feature_names = tfidf.get_feature_names_out()
     df_tfidf = pd.DataFrame(
-        tfidf_matrix.toarray(), 
-        columns=[f"tfidf_{word}" for word in feature_names]
+        tfidf_matrix.toarray(),
+        columns=[f"tfidf_{f}" for f in feature_names]
     )
-    
-    print(f"✅ Vocabulário aprendido: {len(feature_names)} termos.")
-    
-    # Juntar com o DataFrame original (reset_index é vital para alinhar as linhas)
-    df_final = pd.concat([df.reset_index(drop=True), df_tfidf], axis=1)
-    
+
+    print(f"✅ Vocabulário clínico aprendido: {len(feature_names)} termos.")
+
+    df_final = pd.concat(
+        [df.reset_index(drop=True), df_tfidf],
+        axis=1
+    )
+
     return df_final, tfidf

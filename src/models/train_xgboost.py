@@ -64,7 +64,7 @@ def train_model():
 
     # 4. Vetorização (NLP)
     print("🔠 Vetorizando o texto clínico...")
-    df_full, vectorizer = vectorize_text(df, text_column='Diagnostico_Texto_Livre', max_features=50)
+    df_full, vectorizer = vectorize_text(df, text_column='Diagnostico_Texto_Livre', max_features=90)
     
     # Se a vetorização falhar (texto vazio), interrompe
     if vectorizer is None:
