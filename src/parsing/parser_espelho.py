@@ -221,7 +221,25 @@ def parse_text_to_dict(texto_bruto: str) -> dict:
     # Flag geral: existem sinais vitais?
     dados["Sinais_Vitais"] = dados_sv
 
-    
+    # Flag geral de sinais vitais
+    dados["Sinais_Vitais"] = int(bool(dados_sv))
+
+    # Suporte de O2
+    dados["Sinais_Vitais_O2_Suporte"] = int(
+        dados_sv.get("Sup_O2") not in (None, "0", 0)
+    )
+
+    # Instabilidade hemodinâmica
+    fc = dados_sv.get("F_Cardiaca")
+    fr = dados_sv.get("F_Respiratoria")
+    sat = dados_sv.get("Saturacao")
+
+    dados["Instabilidade_Hemodinamica"] = int(
+        (fc is not None and int(fc) > 100) or
+        (fr is not None and int(fr) > 20) or
+        (sat is not None and int(sat) < 94)
+    )
+
     # Se quiser manter o texto bruto dos sinais vitais para auditoria:
     # dados["Sinais_Vitais_Texto"] = bloco_sinais 
 
