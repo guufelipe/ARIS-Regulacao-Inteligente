@@ -4,11 +4,11 @@ Treinamento do modelo XGBoost do projeto ARIS.
 Este script:
 - Utiliza dados clínicos extraídos de espelhos de regulação
 - Combina regras clínicas (flags tabulares) com NLP (TF-IDF)
-- Treina um modelo supervisionado com target heurístico (provisório)
+- Treina um modelo supervisionado com target heurístico (EXPERIMENTAL)
 
 IMPORTANTE:
-O target ainda NÃO representa a decisão real da regulação.
-Ele simula a lógica do protocolo oficial enquanto não há rótulos reais.
+Este target é TEMPORÁRIO e serve apenas para validação técnica
+do pipeline de ML. NÃO representa decisão clínica real.
 """
 
 import os
@@ -23,44 +23,59 @@ from sklearn.metrics import classification_report
 from src.features.text_vectorization import vectorize_text
 from src.features.feature_builder import FeatureBuilder
 
+import inspect
+from src.features import text_vectorization
+
+print(
+    "📂 Arquivo de vetorização carregado:",
+    inspect.getfile(text_vectorization)
+)
 
 # =============================================================================
 # CONFIGURAÇÕES DE CAMINHO
 # =============================================================================
 
-PROCESSED_DATA_PATH = 'data/processed/dataset_espelhos.csv'
-MODEL_OUTPUT_PATH = 'models/xgboost_model.json'
-VECTORIZER_PATH = 'models/vectorizers/tfidf_vectorizer.pkl'
-
+PROCESSED_DATA_PATH = "data/processed/dataset_espelhos.csv"
+MODEL_OUTPUT_PATH = "models/xgboost_model.json"
+VECTORIZER_PATH = "models/vectorizers/tfidf_vectorizer.pkl"
 
 # =============================================================================
-# TARGET HEURÍSTICO (PROVISÓRIO)
+# TARGET HEURÍSTICO — MODO EXPERIMENTAL
 # =============================================================================
+
 
 def gerar_target_simulado(row):
     """
-    Gera um rótulo binário (Target) simulando a decisão da regulação,
-    baseado estritamente nas regras do protocolo.
+    TARGET EXPERIMENTAL (modo debug técnico).
 
-    Retorna:
-    1 → Caso elegível para gastro
-    0 → Caso NÃO elegível
+    Estratégia:
+    - Criar variabilidade (0 e 1)
+    - Refletir "caso clínico relevante" de forma ampla
+    - Permitir treino, predição e inspeção do modelo
+
+    ⚠️ NÃO É PROTOCOLO CLÍNICO
     """
 
-    # Critérios de exclusão são soberanos
-    if (
-        row['Necessidade_Dialise'] == 1 or
-        row['Sinais_Vitais_O2_Suporte'] == 1 or
-        row['Instabilidade_Hemodinamica'] == 1 or
-        row['Hemorragia_Ativa'] == 1 or
-        row['Suspeita_Infecciosa'] == 1 or
-        row['Oncologia_Fora_Perfil'] == 1
-    ):
-        return 0
-
-    # Critério de inclusão (perfil gastro)
-    if row['Sinais_Gastro_Hepato'] == 1:
+    # 1. Indício direto de gastro
+    if row.get("Sinais_Gastro_Hepato", 0) == 1:
         return 1
+
+    # 2. Situações clínicas relevantes (proxy)
+    if (
+        row.get("Hemorragia_Ativa", 0) == 1
+        or row.get("Suspeita_Infecciosa", 0) == 1
+    ):
+        return 1
+
+    # 3. Adulto internado com evolução registrada (sinal fraco, mas útil)
+    try:
+        if (
+            pd.notna(row.get("Idade"))
+            and row.get("Idade", 0) >= 40
+        ):
+            return 1
+    except Exception:
+        pass
 
     return 0
 
@@ -68,6 +83,7 @@ def gerar_target_simulado(row):
 # =============================================================================
 # PIPELINE DE TREINAMENTO
 # =============================================================================
+
 
 def train_model():
     print("🚀 Iniciando treinamento do modelo ARIS (XGBoost)...")
@@ -84,75 +100,85 @@ def train_model():
     print(f"📊 Registros carregados: {df.shape[0]}")
 
     # -------------------------------------------------------------------------
-    # 2. GERAÇÃO DO TARGET (HEURÍSTICO)
+    # 2. GERAÇÃO DO TARGET (EXPERIMENTAL)
     # -------------------------------------------------------------------------
-    print("🎯 Gerando target heurístico baseado no protocolo...")
-    df['Target'] = df.apply(gerar_target_simulado, axis=1)
+    print("🎯 Gerando target heurístico EXPERIMENTAL...")
+    df["Target"] = df.apply(gerar_target_simulado, axis=1)
 
     print("⚖️ Distribuição das classes:")
-    print(df['Target'].value_counts())
+    print(df["Target"].value_counts())
 
     # -------------------------------------------------------------------------
     # 3. VETORIZAÇÃO DOS TEXTOS CLÍNICOS (NLP)
     # -------------------------------------------------------------------------
     print("🔠 Vetorizando textos clínicos com TF-IDF...")
 
-    # Campos textuais relevantes do espelho
     TEXT_COLUMNS = [
-        'Justificativa_Internacao',
-        'Evolucao',
-        'Sinais_Vitais_Texto'
+        "Justificativa_Internacao",
+        "Evolucao",
+        "Sinais_Vitais_Texto",
     ]
 
     df_nlp, vectorizer = vectorize_text(
         df,
         text_columns=TEXT_COLUMNS,
-        max_features=300  # Espaço maior para capturar termos clínicos
+        max_features=300,
     )
 
     if vectorizer is None:
         print("❌ Falha na vetorização (textos vazios). Abortando treino.")
         return
 
-    # Salva o vetorizador para uso em inferência
     os.makedirs(os.path.dirname(VECTORIZER_PATH), exist_ok=True)
     joblib.dump(vectorizer, VECTORIZER_PATH)
     print(f"💾 Vetorizador salvo em: {VECTORIZER_PATH}")
 
     # -------------------------------------------------------------------------
-    # 4. FEATURE BUILDER (TABULAR FINAL)
+    # 4. FEATURE BUILDER
     # -------------------------------------------------------------------------
     print("🔧 Aplicando FeatureBuilder (limpeza e validação final)...")
 
     builder = FeatureBuilder()
     df_final = builder.transform(df_nlp)
 
-    # Aviso de integridade da idade
-    if 'Idade' in df_final.columns:
-        nulos_idade = df_final['Idade'].isna().sum()
+    if "Idade" in df_final.columns:
+        nulos_idade = df_final["Idade"].isna().sum()
         if nulos_idade > 0:
             print(f"⚠️ {nulos_idade} registros com Idade inválida (NaN).")
 
     # -------------------------------------------------------------------------
-    # 5. SEPARAÇÃO DE FEATURES E TARGET
+    # 5. MATRIZ DE TREINO (FILTRAGEM FINAL)
     # -------------------------------------------------------------------------
     print("🧱 Preparando matriz de treino...")
 
-    X = df_final.drop(columns=['Target'])
-    y = df_final['Target']
+    y = df_final["Target"]
+
+    X = (
+        df_final
+        .drop(columns=["Target"])
+        .select_dtypes(include=["number", "bool"])
+    )
+
+    print(f"🧹 Features finais para treino: {X.shape[1]} colunas numéricas")
+
+    if y.nunique() < 2:
+        raise ValueError(
+            "❌ Target ainda degenerado. "
+            "Mesmo no modo experimental não há variabilidade."
+        )
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
         test_size=0.3,
         random_state=42,
-        stratify=y
+        stratify=y,
     )
 
     print(f"📐 Treino: {X_train.shape} | Teste: {X_test.shape}")
 
     # -------------------------------------------------------------------------
-    # 6. TREINAMENTO DO MODELO
+    # 6. TREINAMENTO
     # -------------------------------------------------------------------------
     model = XGBClassifier(
         n_estimators=150,
@@ -160,9 +186,9 @@ def train_model():
         max_depth=3,
         subsample=0.8,
         colsample_bytree=0.8,
-        eval_metric='logloss',
+        eval_metric="logloss",
         missing=np.nan,
-        random_state=42
+        random_state=42,
     )
 
     print("🧠 Treinando XGBoost...")
@@ -171,12 +197,12 @@ def train_model():
     # -------------------------------------------------------------------------
     # 7. AVALIAÇÃO
     # -------------------------------------------------------------------------
-    print("\n📊 Avaliação do modelo (Target heurístico):")
+    print("\n📊 Avaliação do modelo (TARGET EXPERIMENTAL):")
     y_pred = model.predict(X_test)
     print(classification_report(y_test, y_pred, digits=3))
 
     # -------------------------------------------------------------------------
-    # 8. SALVAMENTO DO MODELO
+    # 8. SALVAMENTO
     # -------------------------------------------------------------------------
     os.makedirs(os.path.dirname(MODEL_OUTPUT_PATH), exist_ok=True)
     model.save_model(MODEL_OUTPUT_PATH)
@@ -186,15 +212,17 @@ def train_model():
     # 9. IMPORTÂNCIA DAS FEATURES
     # -------------------------------------------------------------------------
     importances = (
-        pd.DataFrame({
-            'Feature': X.columns,
-            'Importance': model.feature_importances_
-        })
-        .sort_values(by='Importance', ascending=False)
+        pd.DataFrame(
+            {
+                "Feature": X.columns,
+                "Importance": model.feature_importances_,
+            }
+        )
+        .sort_values(by="Importance", ascending=False)
     )
 
-    print("\n🔍 Top 10 variáveis mais importantes:")
-    print(importances.head(10))
+    print("\n🔍 Top 20 variáveis mais importantes:")
+    print(importances.head(20))
 
 
 # =============================================================================

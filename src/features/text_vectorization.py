@@ -90,8 +90,10 @@ def prepare_text_for_vectorization(row):
 # =============================
 def vectorize_text(
     df,
+    text_columns=None,  # parâmetro aceito para compatibilidade
     max_features=300
 ):
+
     print("🧠 Iniciando Vetorização TF-IDF (v2 clínica)...")
 
     # Texto final agregado
@@ -109,7 +111,7 @@ def vectorize_text(
         max_features=max_features,
         stop_words=custom_stopwords,
         ngram_range=(1, 3),
-        min_df=2
+        min_df=1 # Considerar termos que apareçam em pelo menos 1 documento (ajustável para evitar sparsity) -> Passar para 2 ou 3 se o vocabulário ficar muito grande
     )
 
     try:

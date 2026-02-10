@@ -18,4 +18,9 @@ models/*
 
 # Environment
 .venv/
-.env
+.env/
+__pycache__/
+models/*.json
+models/vectorizers/*.pkl
+data/raw/
+data/processed/
