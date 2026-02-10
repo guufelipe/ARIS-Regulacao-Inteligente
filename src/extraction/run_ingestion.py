@@ -48,6 +48,10 @@ Pipeline:
 PDF → Texto → Parsing clínico → CSV consolidado
 """
 
+"""
+ARIS – Pipeline de Ingestão e Parsing de Espelhos Clínicos
+"""
+
 import os
 import pandas as pd
 from src.extraction.pdf_extractor import extract_text_from_pdf
@@ -64,18 +68,14 @@ OUTPUT_FILE = "dataset_espelhos.csv"
 # ===============================
 # Contrato mínimo de colunas
 # ===============================
-# Mesmo que algum campo não exista em um PDF,
-# ele deve existir no CSV final (com NaN ou vazio)
 
 EXPECTED_COLUMNS = [
     "Nome_Arquivo",
     "Idade",
     "Sexo",
-    "Diagnostico_Texto_Livre",
     "Justificativa_Internacao",
     "Evolucao",
     "Sinais_Vitais",
-    # Flags clínicas
     "Necessidade_Dialise",
     "Sinais_Vitais_O2_Suporte",
     "Instabilidade_Hemodinamica",
@@ -93,10 +93,8 @@ EXPECTED_COLUMNS = [
 def main():
     print("🚀 Iniciando pipeline de ingestão ARIS")
 
-    # 0) Garantir pasta de saída
     os.makedirs(PROCESSED_DIR, exist_ok=True)
 
-    # 1) Listar PDFs
     arquivos_pdf = [
         f for f in os.listdir(RAW_DIR)
         if f.lower().endswith(".pdf")
@@ -108,42 +106,45 @@ def main():
         print("⚠️ Nenhum PDF encontrado. Encerrando.")
         return
 
-    registros = []
+    registros = []  # ✅ lista correta
 
-    # 2) Loop principal de processamento
+    # ===============================
+    # Loop principal
+    # ===============================
     for nome_arquivo in arquivos_pdf:
         print(f"➡️ Processando: {nome_arquivo}")
         caminho_pdf = os.path.join(RAW_DIR, nome_arquivo)
 
-        # 2.1 Extração de texto
         texto_bruto = extract_text_from_pdf(caminho_pdf)
 
         if not texto_bruto or len(texto_bruto.strip()) < 20:
             print(f"⚠️ Texto insuficiente em {nome_arquivo}. Possível PDF escaneado.")
             continue
 
-        # 2.2 Parsing clínico
-        dados = parse_text_to_dict(texto_bruto)
-        dados["Nome_Arquivo"] = nome_arquivo
+        try:
+            dados = parse_text_to_dict(texto_bruto)
+            dados["Nome_Arquivo"] = nome_arquivo
+            registros.append(dados)  # ✅ ESSENCIAL
 
-        registros.append(dados)
+        except Exception as e:
+            print(f"❌ Erro ao parsear {nome_arquivo}: {e}")
 
-    # 3) Consolidação
+    # ===============================
+    # Consolidação final
+    # ===============================
     if not registros:
         print("❌ Nenhum registro válido foi processado.")
         return
 
     df = pd.DataFrame(registros)
 
-    # 4) Garantia de schema
+    # Garantia de schema
     for col in EXPECTED_COLUMNS:
         if col not in df.columns:
             df[col] = pd.NA
 
-    # Reordena colunas
     df = df[EXPECTED_COLUMNS]
 
-    # 5) Salvamento
     output_path = os.path.join(PROCESSED_DIR, OUTPUT_FILE)
     df.to_csv(output_path, index=False)
 
@@ -151,7 +152,7 @@ def main():
     print(f"📊 Registros processados: {len(df)}")
     print(f"💾 Arquivo salvo em: {output_path}")
     print("\n🧪 Amostra dos dados:")
-    print(df.head())
+    print(df.head().T)
 
 
 if __name__ == "__main__":

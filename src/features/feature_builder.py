@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 class FeatureBuilder:
     def __init__(self):
         """
@@ -14,21 +15,24 @@ class FeatureBuilder:
         """
         pass
 
-    def fit(self, df):
+    def fit(self, df: pd.DataFrame):
+        """
+        Mantido por compatibilidade com pipeline sklearn.
+        """
         return self
 
-    def transform(self, df):
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
         df_clean = df.copy()
 
         # =====================================================
-        # 1. IDADE (Regra de Negócio: Adulto)
+        # 1. IDADE (REGRA DE NEGÓCIO: ADULTO)
         # =====================================================
         if 'Idade' in df_clean.columns:
             df_clean['Idade'] = pd.to_numeric(df_clean['Idade'], errors='coerce')
             df_clean.loc[df_clean['Idade'] < 15, 'Idade'] = np.nan
 
         # =====================================================
-        # 2. SEXO
+        # 2. SEXO (ENCODE BINÁRIO SIMPLES)
         # =====================================================
         if 'Sexo' in df_clean.columns:
             df_clean['Sexo_Encoded'] = df_clean['Sexo'].apply(
@@ -36,33 +40,52 @@ class FeatureBuilder:
             )
 
         # =====================================================
-        # 3. FLAGS MÉDICAS BINÁRIAS
+        # 3. FLAGS CLÍNICAS BINÁRIAS
         # =====================================================
         flags_importantes = [
-            'Necessidade_Dialise', 
-            'Sinais_Vitais_O2_Suporte', 
-            'Instabilidade_Hemodinamica', 
+            'Necessidade_Dialise',
+            'Sinais_Vitais_O2_Suporte',
+            'Instabilidade_Hemodinamica',
             'Hemorragia_Ativa',
-            'Suspeita_Infecciosa', 
+            'Suspeita_Infecciosa',
             'Oncologia_Fora_Perfil',
             'Sinais_Gastro_Hepato'
         ]
 
         for col in flags_importantes:
             if col in df_clean.columns:
-                df_clean[col] = df_clean[col].fillna(0).astype(int)
+                df_clean[col] = (
+                    pd.to_numeric(df_clean[col], errors='coerce')
+                    .fillna(0)
+                    .astype(int)
+                )
 
         # =====================================================
-        # 4. PROTEÇÃO DAS FEATURES TF-IDF
+        # 4. FEATURES TF-IDF (SEGURANÇA NUMÉRICA)
         # =====================================================
         tfidf_cols = [c for c in df_clean.columns if c.startswith('tfidf_')]
+
         for col in tfidf_cols:
-            df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0.0)
+            df_clean[col] = (
+                pd.to_numeric(df_clean[col], errors='coerce')
+                .fillna(0.0)
+            )
 
         # =====================================================
-        # 5. REMOÇÃO DE TEXTO CRU (ANTI-VAZAMENTO)
+        # 5. REMOÇÃO DE TEXTO CRU (ANTI-VAZAMENTO + CONTRATO)
         # =====================================================
+        # Campos textuais agora vêm do parser estruturado
         colunas_texto = [
+            # Justificativa (subcampos)
+            'Quadro_Clinico',
+            'Condicoes_Internacao',
+            'Resultados_Exames',
+            'Diagnostico_Inicial',
+
+            # Evolução
+            'Evolucao_Descricao',
+
+            # Campos antigos / legado (se aparecerem)
             'Justificativa_Internacao',
             'Evolucao',
             'Sinais_Vitais_Texto',
@@ -74,5 +97,11 @@ class FeatureBuilder:
             inplace=True,
             errors='ignore'
         )
+
+        # =====================================================
+        # 6. LIMPEZA FINAL
+        # =====================================================
+        # Remove colunas completamente vazias (defensivo)
+        df_clean.dropna(axis=1, how='all', inplace=True)
 
         return df_clean
