@@ -241,7 +241,8 @@ def parse_text_to_dict(texto_bruto: str) -> dict:
     )
 
     # Se quiser manter o texto bruto dos sinais vitais para auditoria:
-    # dados["Sinais_Vitais_Texto"] = bloco_sinais 
+    dados["Sinais_Vitais"] = dados_sv
+
 
     print("=== BLOCO SINAIS VITAIS ===")
     print(bloco_sinais)
