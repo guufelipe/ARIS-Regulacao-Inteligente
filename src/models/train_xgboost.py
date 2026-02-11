@@ -181,15 +181,17 @@ def train_model():
     # 6. TREINAMENTO
     # -------------------------------------------------------------------------
     model = XGBClassifier(
-        n_estimators=150,
-        learning_rate=0.05,
-        max_depth=3,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        eval_metric="logloss",
-        missing=np.nan,
-        random_state=42,
+    n_estimators=50,
+    max_depth=3,
+    min_child_weight=0.1,
+    gamma=0,
+    learning_rate=0.1,
+    subsample=1.0,
+    colsample_bytree=1.0,
+    eval_metric="logloss",
+    random_state=42
     )
+
 
     print("🧠 Treinando XGBoost...")
     model.fit(X_train, y_train)
