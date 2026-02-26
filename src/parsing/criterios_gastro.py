@@ -61,7 +61,7 @@ TERMOS_EXCLUSAO = {
         'intubado', 'iot', 'ventilação mecanica', 'vm', 'tot ',
         'traqueostomia', 'macronebulização', 'cateter de o2',
         'mascara de o2', 'saturação < 90', 'sat < 90'
-    ],
+    ],   
 
     # 3. Nefrologia / Diálise
     # Pacientes com insuficiência renal grave ou em TRS
@@ -232,3 +232,8 @@ def avaliar_elegibilidade(flags_exclusao, flags_inclusao):
         return 1
 
     return 0
+
+
+#Recusa:
+#creatinina > 3
+#clearence creatinina > 15 || creatinina > 3. valor_basal
